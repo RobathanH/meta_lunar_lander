@@ -1,0 +1,7 @@
+conda create --name cs238 python=3.9 -y
+conda activate cs238
+conda install -c conda-forge gymnasium-all -y
+conda install ipykernel ipywidgets -y
+conda install pytorch torchvision torchaudio pytorch-cuda=11.6 -c pytorch -c nvidia -y
+conda install click -y
+conda install -c conda-forge tensorboard -y
