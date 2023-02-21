@@ -19,7 +19,7 @@ from algorithms import Trainer
 @click.command()
 @click.argument("config")
 @click.option("-r", "--resume", "load_dir", default=None, help="Resume an existing run with the given output folder")
-@click.option("-t", "iterations", type=int, default=100, help="Number of iterations to run.")
+@click.option("-t", "iterations", type=int, default=10000, help="Number of iterations to run.")
 def main(config: str, load_dir: Optional[str], iterations: int):
     '''
     Load config with defaults.
@@ -100,7 +100,7 @@ def main(config: str, load_dir: Optional[str], iterations: int):
                     os.path.join(output_dir, "videos"),
                     episode_trigger=lambda x: True,
                     fps=env.metadata["render_fps"],
-                    name_prefix=f"step_{it}.task_{task_index}.offset_{env.task_params[task_index, 0]:.2f}_{env.task_params[task_index, 1]:.2f}"
+                    name_prefix=f"step_{trainer.trainer_state['global_step']}.task_{task_index}.offset_{env.task_params[task_index, 0]:.2f}_{env.task_params[task_index, 1]:.2f}"
                 )
                 
         # Periodically save
@@ -109,7 +109,7 @@ def main(config: str, load_dir: Optional[str], iterations: int):
         
         # Log
         for k, v in log_info.items():
-            logger.add_scalar(k, v, global_step=it)
+            logger.add_scalar(k, v, global_step=trainer.trainer_state["global_step"])
         
 
     

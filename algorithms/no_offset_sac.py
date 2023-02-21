@@ -118,6 +118,8 @@ class NoOffsetSAC(Trainer):
         return self.wrapped_policy
         
     def train_step(self, task_indices: List[int], trajectories: List[List[Trajectory]]) -> dict:
+        super().train_step(task_indices, trajectories)
+        
         # Add trajectories to buffer AFTER ADDING ACTION OFFSET TO PRODUCE TRUE ENV ACTIONS
         for task_index, task_trajs in zip(task_indices, trajectories):
             for traj in task_trajs:

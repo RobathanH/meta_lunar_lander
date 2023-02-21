@@ -16,14 +16,14 @@ default_config = dict(
     train_episodes=1,           # Number of rollouts per task for train step
     
     # Eval data rollouts
-    test_period=4,              # How often to collect test metrics
+    test_period=10,             # How often to collect test metrics
     test_task_batch_size=8,     # Number of test tasks to sample for eval step
     test_episodes=1,            # Number of rollouts per task for eval step
     
     # Record rollouts
-    record_period=10,           # How often to collect rollout recordings
+    record_period=100,          # How often to collect rollout recordings
     record_episodes=2,          # Number of rollouts per task for recording
     
     # Saving checkpoints
-    save_period=4,              # How often to save network state.
+    save_period=10,             # How often to save network state.
 )

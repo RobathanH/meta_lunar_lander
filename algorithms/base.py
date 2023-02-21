@@ -91,6 +91,15 @@ class Trainer(ABC):
             ])
         else:
             self.task_params = np.load(os.path.join(load_dir, "task_params.npy"))
+            
+        # Create or load state variables
+        if load_dir is None:
+            self.trainer_state = {
+                "global_step": 0
+            }
+        else:
+            with open(os.path.join(load_dir, "trainer_state.json"), "r") as fp:
+                self.trainer_state = json.load(fp)
         
     def save(self, output_dir: str) -> None:
         """Saves the stored config and task parameters to fixed filenames within the save folder.
@@ -108,13 +117,15 @@ class Trainer(ABC):
         # Save task parameters (these also don't change, but should be saved for if we resume this run later)
         np.save(os.path.join(output_dir, "task_params.npy"), self.task_params)
         
-    @abstractmethod
+        # Save trainer state (right now this just saves the total number of training steps, allowing logs to resume without overriding prev run)
+        with open(os.path.join(output_dir, "trainer_state.json"), "w") as fp:
+            json.dump(self.trainer_state, fp)
+        
     def current_policy(self) -> Policy:
         """Current most-trained policy for rollouts.
         """
-        pass
+        raise NotImplementedError
         
-    @abstractmethod
     def train_step(self, task_indices: List[int], trajectories: List[List[Trajectory]]) -> dict:
         """_summary_
 
@@ -125,4 +136,6 @@ class Trainer(ABC):
         Returns:
             dict: Any training metrics that should be logged.
         """
-        pass
+        # Update trainer state
+        self.trainer_state["global_step"] += 1
+        return {}
