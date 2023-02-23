@@ -48,10 +48,8 @@ class ExpBuffer:
         
     def add_trajectory(self, traj: Trajectory) -> None:
         # Concatenate tuples
-        done_flag = np.zeros((len(traj), 1))
-        done_flag[-1, 0] = 1 # Mark final sample in trajectory as being the end
         new_samples = torch.from_numpy(np.concatenate([
-            traj.states, traj.actions, traj.rewards, traj.next_states, done_flag
+            traj.states, traj.actions, traj.rewards, traj.next_states, traj.done_mask
         ], axis=1))
         
         # Add to buffer, considering wrapping around to start position

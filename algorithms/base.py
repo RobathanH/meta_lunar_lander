@@ -13,21 +13,27 @@ Properties:
     actions:
     rewards:
     next_states:
+    done_mask:
 '''
 class Trajectory:
-    def __init__(self, task_index: int, states: List[np.ndarray], actions: List[np.ndarray], rewards: List[float]):
+    def __init__(self, task_index: int, states: List[np.ndarray], actions: List[np.ndarray], rewards: List[float], terminated: bool = True):
         """
         Args:
             task_index (int): Index of the task used to collect this trajectory.
             states (List[np.ndarray]): List of states encountered, including the final ending state
             actions (List[np.ndarray]): List of actions taken. Should be 1 shorter than states list.
             rewards (List[float]): List of rewards received. Should be 1 shorter than states list.
+            terminated (bool): Whether the episode was ended by a game-over state, as opposed to a step limit (in which case we may want the agent to keep reasoning forward to possible future states)
         """
         self.task_index = task_index
         self.states = np.array(states[:-1])
         self.actions = np.array(actions)
         self.rewards = np.array(rewards).reshape(-1, 1)
         self.next_states = np.array(states[1:])
+        
+        self.done_mask = np.zeros(len(actions)).reshape(-1, 1)
+        if terminated:
+            self.done_mask[-1, 0] = 1
         
     def __len__(self) -> int:
         return len(self.states)

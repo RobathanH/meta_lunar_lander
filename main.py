@@ -82,13 +82,13 @@ def main(config: str, load_dir: Optional[str], iterations: int):
         log_info.update({f"trainer/{k}": v for k, v in trainer_metrics.items()})
         
         # Periodically run on test
-        if it % config["test_period"] == 0:
+        if config["test_period"] and it % config["test_period"] == 0:
             test_task_indices = (config["num_train_tasks"] + np.random.choice(config["num_test_tasks"], size=config["test_task_batch_size"], replace=True)).tolist()
             rollouts, test_env_metrics, _ = collect_trajectories(env, trainer.current_policy(), test_task_indices, config["test_episodes"])
             log_info.update({f"test_env/{k}": v for k, v in test_env_metrics.items()})
         
         # Periodically record
-        if it % config["record_period"] == 0:
+        if config["record_period"] and it % config["record_period"] == 0:
             # Use fixed tasks for recording, to make it easier to see improvements
             # One train task, one test task
             record_task_indices = [0, config["num_train_tasks"]]
@@ -104,13 +104,12 @@ def main(config: str, load_dir: Optional[str], iterations: int):
                 )
                 
         # Periodically save
-        if it % config["save_period"] == 0:
+        if config["save_period"] and it % config["save_period"] == 0:
             trainer.save(output_dir)
         
         # Log
         for k, v in log_info.items():
             logger.add_scalar(k, v, global_step=trainer.trainer_state["global_step"])
-        
 
     
     

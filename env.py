@@ -32,7 +32,7 @@ class ActionOffsetLunarLander(LunarLander):
 
 def collect_trajectories(env: ActionOffsetLunarLander, policy: Policy, 
                          task_indices: List[int], num_episodes: int,
-                         render: bool = False
+                         max_episode_length: int = 400, render: bool = False
                          ) -> Tuple[
                                 List[List[Trajectory]],
                                 dict,
@@ -69,17 +69,23 @@ def collect_trajectories(env: ActionOffsetLunarLander, policy: Policy,
             
             policy.reset(task_index)
             s, _ = env.reset(task_index)
-            done = False
+            terminated = False
+            truncated = False
+            episode_length = 0
             if render:
                 frames[-1].append(env.render())
             
             # Save initial state
             states.append(s)
             
-            while not done:
+            while not (terminated or truncated):
                 a = policy.get_action(s)
                 next_s, r, terminated, truncated, info = env.step(a)
-                done = terminated or truncated
+                episode_length += 1
+                
+                # Artificially truncate if over episode max length
+                if episode_length >= max_episode_length:
+                    truncated = True
                 
                 if render:
                     frames[-1].append(env.render())
@@ -95,7 +101,7 @@ def collect_trajectories(env: ActionOffsetLunarLander, policy: Policy,
                 # Prepare for next step
                 s = next_s
             
-            trajectories[-1].append(Trajectory(task_index, states, actions, rewards))
+            trajectories[-1].append(Trajectory(task_index, states, actions, rewards, terminated=terminated))
             
     # TODO: Compute metrics
     metrics = {

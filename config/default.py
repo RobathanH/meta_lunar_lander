@@ -6,13 +6,13 @@ default_config = dict(
     # Environment and Tasks
     observation_size=8,
     action_size=2,
-    discount_rate=0.9,
+    discount_rate=0.99,
     action_offset_magnitude=0.2,
     num_train_tasks=100,
     num_test_tasks=20,
     
     # Train data rollouts
-    train_task_batch_size=8,    # Number of train tasks to sample for train step
+    train_task_batch_size=1,    # Number of train tasks to sample for train step
     train_episodes=1,           # Number of rollouts per task for train step
     
     # Eval data rollouts

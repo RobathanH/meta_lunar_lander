@@ -132,6 +132,8 @@ class NoOffsetSAC(Trainer):
         q2_losses = []
         vf_losses = []
         policy_losses = []
+        entropies = []
+        action_values = []
         
         for _ in range(self.algo_config["updates_per_train_step"]):
             batch = self.exp_buffer.sample(self.algo_config["batch_size"]).to(DEVICE)
@@ -141,24 +143,27 @@ class NoOffsetSAC(Trainer):
             )
             
             # Q function update - use offline data directly
-            q1_pred = self.qf1(state, action)
-            q2_pred = self.qf2(state, action)
+            # Update each q function on dif data to keep them independent
             q_target = reward + (1 - done_mask) * self.config["discount_rate"] * self.target_vf(next_state).detach()
-            q1_loss = F.mse_loss(q1_pred, q_target)
-            q2_loss = F.mse_loss(q2_pred, q_target)
             
-            self.qf1_optimizer.zero_grad()
-            q1_loss.backward()
-            self.qf1_optimizer.step()
-            
-            self.qf2_optimizer.zero_grad()
-            q2_loss.backward()
-            self.qf2_optimizer.step()
+            if np.random.rand() > 0.5:
+                q1_loss = F.mse_loss(self.qf1(state, action), q_target)
+                q2_loss = None
+                self.qf1_optimizer.zero_grad()
+                q1_loss.backward()
+                self.qf1_optimizer.step()
+            else:
+                q1_loss = None
+                q2_loss = F.mse_loss(self.qf2(state, action), q_target)
+                self.qf2_optimizer.zero_grad()
+                q2_loss.backward()
+                self.qf2_optimizer.step()
             
             
             
             # Sample new actions and likelihoods from current policy
             new_action, log_prob, eps, mean, log_std = self.policy.evaluate(state)
+            entropy = -log_prob
             new_action_value = torch.min(
                 self.qf1(state, new_action),
                 self.qf2(state, new_action)
@@ -166,7 +171,7 @@ class NoOffsetSAC(Trainer):
             
             # V function update
             v_pred = self.vf(state)
-            v_target = new_action_value - log_prob.detach()
+            v_target = new_action_value + self.algo_config["entropy_coef"] * entropy.detach()
             vf_loss = F.mse_loss(v_pred, v_target)
             
             self.vf_optimizer.zero_grad()
@@ -174,7 +179,7 @@ class NoOffsetSAC(Trainer):
             self.vf_optimizer.step()
             
             # Policy update
-            policy_loss = (log_prob - new_action_value).mean()
+            policy_loss = -(new_action_value + self.algo_config["entropy_coef"] * entropy).mean()
             
             self.policy_optimizer.zero_grad()
             policy_loss.backward()
@@ -191,16 +196,24 @@ class NoOffsetSAC(Trainer):
                 
                 
             # Save loss for logging
-            q1_losses.append(q1_loss.item())
-            q2_losses.append(q2_loss.item())
+            if q1_loss:
+                q1_losses.append(q1_loss.item())
+            if q2_loss:
+                q2_losses.append(q2_loss.item())
             vf_losses.append(vf_loss.item())
             policy_losses.append(policy_loss.item())
+            entropies.append(entropy.detach().mean())
+            action_values.append(new_action_value.mean())
             
         # Collect metrics
-        metrics = {
-            "q1_loss": sum(q1_losses) / len(q1_losses),
-            "q2_loss": sum(q2_losses) / len(q2_losses),
-            "vf_loss": sum(vf_losses) / len(vf_losses),
-            "policy_loss": sum(policy_losses) / len(policy_losses)
-        }
+        metrics = {}
+        if len(q1_losses):
+            metrics["q1_loss"] = sum(q1_losses) / len(q1_losses)
+        if len(q2_losses):
+            metrics["q2_loss"] = sum(q2_losses) / len(q2_losses)
+        metrics["vf_loss"] = sum(vf_losses) / len(vf_losses)
+        metrics["policy_loss"] = sum(policy_losses) / len(policy_losses)
+        metrics["entropy"] = sum(entropies) / len(entropies)
+        metrics["action_values"] = sum(action_values) / len(action_values)
+        
         return metrics
