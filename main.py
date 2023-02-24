@@ -37,9 +37,12 @@ def main(config: str, load_dir: Optional[str], iterations: int):
     '''
     if config["algo_class"] == "temp":
         trainer = Trainer(config, load_dir=load_dir)
-    if config["algo_class"] == "no_offset_sac":
+    elif config["algo_class"] == "no_offset_sac":
         from algorithms import NoOffsetSAC
         trainer = NoOffsetSAC(config, load_dir=load_dir)
+    elif config["algo_class"] == "no_offset_ddpg":
+        from algorithms import NoOffsetDDPG
+        trainer = NoOffsetDDPG(config, load_dir=load_dir)
     else:
         raise NotImplementedError
     

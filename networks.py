@@ -1,4 +1,4 @@
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Callable
 import torch
 import torch.nn as nn
 from torch.distributions.normal import Normal
@@ -8,12 +8,15 @@ from torch.distributions.normal import Normal
 Simple MLP with ReLU activation. Automatically concatenates inputs if multiple are provided.
 '''
 class MLP(nn.Module):
-    def __init__(self, layer_sizes: List[int]):
+    def __init__(self, layer_sizes: List[int], final_activation: Optional[Callable] = None):
         """
         Args:
             layer_sizes (List[int]): Size of each layer, including input and output.
+            final_activation (Optional[Callable]): Activation function to call on the output of the network.
         """
         super().__init__()
+        
+        self.final_activation = final_activation
         
         layers = []
         for in_size, out_size in zip(layer_sizes[:-1], layer_sizes[1:]):
@@ -24,8 +27,10 @@ class MLP(nn.Module):
         self.net = nn.Sequential(*layers)
         
     def forward(self, *x: torch.Tensor) -> torch.Tensor:
-        return self.net(torch.cat(x, dim=1))
-    
+        out = self.net(torch.cat(x, dim=1))
+        if self.final_activation is not None:
+            out = self.final_activation(out)
+        return out    
     
 '''
 Gaussian policy network.
