@@ -77,7 +77,7 @@ def main(config: str, load_dir: Optional[str], iterations: int):
         task_indices = np.random.choice(config["num_train_tasks"], size=config["train_task_batch_size"], replace=True).tolist()
         
         # Collect rollouts
-        rollouts, train_env_metrics, _ = collect_trajectories(env, trainer.current_policy(), task_indices, config["train_episodes"])
+        rollouts, train_env_metrics, _ = collect_trajectories(env, trainer.current_policy(), task_indices, config["train_episodes"], config["max_episode_length"])
         log_info.update({f"train_env/{k}": v for k, v in train_env_metrics.items()})
         
         # Train step
@@ -87,7 +87,7 @@ def main(config: str, load_dir: Optional[str], iterations: int):
         # Periodically run on test
         if config["test_period"] and it % config["test_period"] == 0:
             test_task_indices = (config["num_train_tasks"] + np.random.choice(config["num_test_tasks"], size=config["test_task_batch_size"], replace=True)).tolist()
-            rollouts, test_env_metrics, _ = collect_trajectories(env, trainer.current_policy(), test_task_indices, config["test_episodes"])
+            rollouts, test_env_metrics, _ = collect_trajectories(env, trainer.current_policy(), test_task_indices, config["test_episodes"], config["max_episode_length"])
             log_info.update({f"test_env/{k}": v for k, v in test_env_metrics.items()})
         
         # Periodically record
@@ -96,7 +96,7 @@ def main(config: str, load_dir: Optional[str], iterations: int):
             # One train task, one test task
             record_task_indices = [0, config["num_train_tasks"]]
             
-            _, _, frames = collect_trajectories(env, trainer.current_policy(), record_task_indices, config["record_episodes"], render=True)
+            _, _, frames = collect_trajectories(env, trainer.current_policy(), record_task_indices, config["record_episodes"], config["max_episode_length"], render=True)
             for task_index, task_frames in zip(record_task_indices, frames):
                 save_video(
                     task_frames,

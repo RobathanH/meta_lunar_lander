@@ -6,6 +6,7 @@ default_config = dict(
     # Environment and Tasks
     observation_size=8,
     action_size=2,
+    max_episode_length=400,
     discount_rate=0.99,
     action_offset_magnitude=0.2,
     num_train_tasks=100,

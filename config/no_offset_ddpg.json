@@ -6,8 +6,9 @@
         "exp_buffer_capacity": 1000000,
         "batch_size": 64,
         "updates_per_train_step": 128,
-        "lr": 3e-4,
+        "lr": 1e-4,
         "target_net_update_tau": 1e-3
     },
-    "test_period": null
+    "test_period": null,
+    "max_episode_length": 1000
 }
