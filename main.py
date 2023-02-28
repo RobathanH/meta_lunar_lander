@@ -43,6 +43,9 @@ def main(config: str, load_dir: Optional[str], iterations: int):
     elif config["algo_class"] == "no_offset_ddpg":
         from algorithms import NoOffsetDDPG
         trainer = NoOffsetDDPG(config, load_dir=load_dir)
+    elif config["algo_class"] == "maml_ddpg":
+        from algorithms import MamlDDPG
+        trainer = MamlDDPG(config, load_dir=load_dir)
     else:
         raise NotImplementedError
     

@@ -1,0 +1,16 @@
+{
+    "algo_class": "no_offset_sac",
+    "algo_config": {
+        "hidden_layer_size": 256,
+        "hidden_layer_count": 2,
+        "exp_buffer_capacity": 1000000,
+        "batch_size": 256,
+        "updates_per_train_step": 256,
+        "lr": 3e-4,
+        "entropy_coef": 1.0,
+        "target_vf_update_tau": 5e-3,
+        "log_std_min": -20,
+        "log_std_max": 2
+    },
+    "test_period": null
+}

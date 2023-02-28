@@ -9,7 +9,7 @@ import torch.nn.functional as F
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 from .base import Trainer, Policy, Trajectory
-from networks import MLP, GaussianPolicyNet
+from networks import MLP
 from exp_buffer import ExpBuffer
 
 
@@ -17,30 +17,6 @@ from exp_buffer import ExpBuffer
 Solves original continuous lander problem using DDPG.
 Uses knowledge of true task params to manually correct for current task offset.
 '''
-
-'''
-Common noise function for DDPG and control tasks
-'''
-class ActionNoise:
-    def __init__(self, mu, theta=.2, sigma=0.15, dt=1e-2, x0=None):
-        self.theta = theta
-        self.mu = mu
-        self.sigma = sigma
-        self.dt = dt
-        self.x0 = x0
-        self.reset()
-
-    def __call__(self):
-        x = self.x_prev + self.theta * (self.mu - self.x_prev) * self.dt + \
-            self.sigma * np.sqrt(self.dt) * np.random.normal(size=self.mu.shape)
-        self.x_prev = x
-        return x
-
-    def reset(self):
-        self.x_prev = self.x0 if self.x0 is not None else np.zeros_like(self.mu)
-
-    def __repr__(self):
-        return 'OrnsteinUhlenbeckActionNoise(mu={}, sigma={})'.format(self.mu, self.sigma)
 
 
 
@@ -196,3 +172,31 @@ class NoOffsetDDPG(Trainer):
         metrics["critic_loss"] = sum(critic_losses) / len(critic_losses)
         metrics["actor_loss"] = sum(actor_losses) / len(actor_losses)
         return metrics
+    
+    
+    
+    
+
+'''
+Common noise function for DDPG and control tasks
+'''
+class ActionNoise:
+    def __init__(self, mu, theta=.2, sigma=0.15, dt=1e-2, x0=None):
+        self.theta = theta
+        self.mu = mu
+        self.sigma = sigma
+        self.dt = dt
+        self.x0 = x0
+        self.reset()
+
+    def __call__(self):
+        x = self.x_prev + self.theta * (self.mu - self.x_prev) * self.dt + \
+            self.sigma * np.sqrt(self.dt) * np.random.normal(size=self.mu.shape)
+        self.x_prev = x
+        return x
+
+    def reset(self):
+        self.x_prev = self.x0 if self.x0 is not None else np.zeros_like(self.mu)
+
+    def __repr__(self):
+        return 'OrnsteinUhlenbeckActionNoise(mu={}, sigma={})'.format(self.mu, self.sigma)
