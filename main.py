@@ -22,11 +22,18 @@ from algorithms import Trainer
 @click.option("-t", "iterations", type=int, default=10000, help="Number of iterations to run.")
 def main(config: str, load_dir: Optional[str], iterations: int):
     '''
-    Load config with defaults.
-    TODO: If resuming a previous run, we could load this directly from that run
+    Load command-line arg config file.
+    If resuming from existing run, load config from that run directly
+    (in this case, the config file passed as command-line arg is ignored).
     '''
-    with open(os.path.join(config)) as fp:
-        config = json.load(fp)
+    if load_dir:
+        with open(os.path.join(load_dir, "config.json")) as fp:
+            config = json.load(fp)
+    else:
+        with open(os.path.join(config)) as fp:
+            config = json.load(fp)
+    
+    # Fill in missing values from default config
     config = deep_update_dict(config, default_config)
     
     
