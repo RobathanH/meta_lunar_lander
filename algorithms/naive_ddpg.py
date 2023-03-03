@@ -15,22 +15,19 @@ from util import ActionNoise
 
 
 '''
-Solves original continuous lander problem using DDPG.
-Uses knowledge of true task params to manually correct for current task offset.
+DDPG vanilla-RL algorithm, ignores the offset and treats the meta-RL
+problem like a regular RL problem.
 '''
 
 
 
-class OffsetCorrectedPolicy(Policy):
-    def __init__(self, actor_net: MLP, task_params: np.ndarray, action_size: int):
+class DDPGPolicy(Policy):
+    def __init__(self, actor_net: MLP, action_size: int):
         self.actor_net = actor_net
-        self.task_params = task_params
-        self.current_task_index = 0
-        
         self.noise = ActionNoise(mu=np.zeros(action_size))
         
     def reset(self, task_index: int) -> None:
-        self.current_task_index = task_index
+        pass
         
     def update_memory(self, state: np.ndarray, action: np.ndarray, reward: float, next_state: np.ndarray) -> None:
         pass
@@ -40,13 +37,12 @@ class OffsetCorrectedPolicy(Policy):
         state = torch.from_numpy(state).to(DEVICE).reshape(1, -1)
         action = self.actor_net(state).cpu().numpy().reshape(-1)
         action += self.noise()
-        corrected_action = action - self.task_params[self.current_task_index]
-        return corrected_action
+        return action
 
 
 
 
-class NoOffsetDDPG(Trainer):
+class NaiveDDPG(Trainer):
     def __init__(self, config: dict, load_dir: Optional[str] = None):
         """
         Args:
@@ -103,8 +99,8 @@ class NoOffsetDDPG(Trainer):
         # Create exp buffer
         self.exp_buffer = ExpBuffer(self.algo_config["exp_buffer_capacity"], obs_size, act_size, load_dir=load_dir)
         
-        # Store Policy which uses current network params and automatically accounts for ground-truth offset in returned actions
-        self.wrapped_policy = OffsetCorrectedPolicy(self.actor, self.task_params, act_size)
+        # Store Policy which uses current network params
+        self.wrapped_policy = DDPGPolicy(self.actor, act_size)
         
         
         
@@ -122,10 +118,9 @@ class NoOffsetDDPG(Trainer):
     def train_step(self, task_indices: List[int], trajectories: List[List[Trajectory]]) -> dict:
         super().train_step(task_indices, trajectories)
         
-        # Add trajectories to buffer AFTER ADDING ACTION OFFSET TO PRODUCE TRUE ENV ACTIONS
-        for task_index, task_trajs in zip(task_indices, trajectories):
+        # Add trajectories to buffer
+        for task_trajs in trajectories:
             for traj in task_trajs:
-                traj.actions += self.task_params[task_index] # This is the actual action value that was sent to vanilla LunarLander env
                 self.exp_buffer.add_trajectory(traj)
                 
         # Save average losses

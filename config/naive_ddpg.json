@@ -1,0 +1,14 @@
+{
+    "algo_class": "naive_ddpg",
+    "algo_config": {
+        "hidden_layer_size": 256,
+        "hidden_layer_count": 2,
+        "exp_buffer_capacity": 1000000,
+        "batch_size": 64,
+        "updates_per_train_step": 128,
+        "lr": 1e-4,
+        "target_net_update_tau": 1e-3
+    },
+    "test_period": null,
+    "max_episode_length": 1000
+}

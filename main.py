@@ -37,6 +37,9 @@ def main(config: str, load_dir: Optional[str], iterations: int):
     '''
     if config["algo_class"] == "temp":
         trainer = Trainer(config, load_dir=load_dir)
+    elif config["algo_class"] == "naive_ddpg":
+        from algorithms import NaiveDDPG
+        trainer = NaiveDDPG(config, load_dir=load_dir)
     elif config["algo_class"] == "no_offset_sac":
         from algorithms import NoOffsetSAC
         trainer = NoOffsetSAC(config, load_dir=load_dir)
