@@ -53,10 +53,10 @@ class ExpBuffer:
         ], axis=1))
         
         # Add to buffer, considering wrapping around to start position
-        samples_remaining = len(traj)
+        samples_remaining = len(new_samples)
         while samples_remaining:
             samples_before_wrap = min(samples_remaining, self.capacity - self.next_ind)
-            self.buffer[self.next_ind : self.next_ind + samples_before_wrap] = new_samples[len(traj) - samples_remaining : len(traj) - samples_remaining + samples_before_wrap]
+            self.buffer[self.next_ind : self.next_ind + samples_before_wrap] = new_samples[len(new_samples) - samples_remaining : len(new_samples) - samples_remaining + samples_before_wrap]
             
             # Update counters
             self.next_ind += samples_before_wrap
@@ -113,17 +113,22 @@ class MultiTaskExpBuffer:
                 "full": self.full
             }, fp)
             
-    def add_trajectory(self, task_index: int, traj: Trajectory) -> None:
+    def add_trajectory(self, task_index: int, traj: Trajectory, max_length: Optional[int] = None) -> None:
         # Concatenate tuples
-        new_samples = torch.from_numpy(np.concatenate([
-            traj.states, traj.actions, traj.rewards, traj.next_states, traj.done_mask
-        ], axis=1))
+        if max_length is None:
+            new_samples = torch.from_numpy(np.concatenate([
+                traj.states, traj.actions, traj.rewards, traj.next_states, traj.done_mask
+            ], axis=1))
+        else:
+            new_samples = torch.from_numpy(np.concatenate([
+                traj.states[:max_length], traj.actions[:max_length], traj.rewards[:max_length], traj.next_states[:max_length], traj.done_mask[:max_length]
+            ], axis=1))
         
         # Add to buffer, considering wrapping around to start position
-        samples_remaining = len(traj)
+        samples_remaining = len(new_samples)
         while samples_remaining:
             samples_before_wrap = min(samples_remaining, self.capacity - self.next_ind[task_index])
-            self.buffer[task_index, self.next_ind[task_index] : self.next_ind[task_index] + samples_before_wrap] = new_samples[len(traj) - samples_remaining : len(traj) - samples_remaining + samples_before_wrap]
+            self.buffer[task_index, self.next_ind[task_index] : self.next_ind[task_index] + samples_before_wrap] = new_samples[len(new_samples) - samples_remaining : len(new_samples) - samples_remaining + samples_before_wrap]
             
             # Update counters
             self.next_ind[task_index] += samples_before_wrap

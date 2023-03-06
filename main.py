@@ -56,6 +56,9 @@ def main(config: str, load_dir: Optional[str], iterations: int):
     elif config["algo_class"] == "maml_ddpg":
         from algorithms import MamlDDPG
         trainer = MamlDDPG(config, load_dir=load_dir)
+    elif config["algo_class"] == "pearl_ddpg":
+        from algorithms import PearlDDPG
+        trainer = PearlDDPG(config, load_dir=load_dir)
     else:
         raise NotImplementedError
     
