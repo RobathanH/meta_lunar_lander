@@ -1,0 +1,29 @@
+{
+    "algo_class": "simplified_pearl_ddpg",
+    "algo_config": {
+        "hidden_layer_size": 256,
+        "hidden_layer_count": 2,
+        "exp_buffer_capacity": 50000,
+        "task_encoder_exp_buffer_capacity": 500,
+        "exploration_steps": 8,
+        "batch_size": 8,
+        "updates_per_train_step": 64,
+        "lr": 2e-4,
+        "actor_lr": 5e-5,
+        "critic_lr": null,
+        "encoder_lr": null,
+        "kl_lambda": 4.0,
+        "target_net_update_tau": 1e-3,
+        "pretrained_no_offset_ddpg": "manually_saved_runs/no_offset_ddpg_0",
+        "freeze_agent": true
+    },
+    "action_offset_magnitude": 0.5,
+    "num_train_tasks": 100,
+    "num_test_tasks": 5,
+    "max_episode_length": 600,
+    "train_task_batch_size": 8,
+    "train_episodes": 1,
+    "test_period": 10,
+    "test_task_batch_size": 4,
+    "test_episodes": 1
+}
