@@ -66,7 +66,7 @@ class PearlDDPGPolicy(Policy):
     def get_action(self, state: np.ndarray) -> np.ndarray:
         state = torch.from_numpy(state).type(torch.float).unsqueeze(0).to(DEVICE)
         action = self.actor_net(state, self.latent)
-        action = action.cpu().numpy().flatten()
+        action = action.cpu().numpy().flatten() + self.noise()
         return action
                 
         
@@ -124,7 +124,6 @@ class PearlDDPG(Trainer):
             self.target_critic.load_state_dict(torch.load(os.path.join(load_dir, "target_critic.pt")))
             self.actor.load_state_dict(torch.load(os.path.join(load_dir, "actor.pt")))
             self.target_actor.load_state_dict(torch.load(os.path.join(load_dir, "target_actor.pt")))
-            self.task_encoder.load_state_dict(torch.load(os.path.join(load_dir, "task_encoder.pt")))
             
         # Optimizers
         lr = self.algo_config["lr"]
@@ -133,7 +132,9 @@ class PearlDDPG(Trainer):
         self.encoder_opt = torch.optim.Adam(self.task_encoder.parameters(), lr=self.algo_config.get("encoder_lr", self.algo_config["lr"]) or self.algo_config["lr"])
         
         self.exp_buffer = MultiTaskExpBuffer(config["num_train_tasks"], self.algo_config["exp_buffer_capacity"], obs_size, act_size, load_dir=load_dir)
-        self.task_encoder_exp_buffer = MultiTaskExpBuffer(config["num_train_tasks"], self.algo_config["task_encoder_exp_buffer_capacity"], obs_size, act_size, load_dir=load_dir)
+        
+        # Task encoder exp buffer doesn't get saved or loaded, since it should focus primarily on online data
+        self.task_encoder_exp_buffer = MultiTaskExpBuffer(config["num_train_tasks"], self.algo_config["task_encoder_exp_buffer_capacity"], obs_size, act_size)
         
         self.wrapped_policy = PearlDDPGPolicy(self.actor, self.sample_latent, self.algo_config["exploration_steps"], obs_size, act_size, latent_size)
         
@@ -193,35 +194,23 @@ class PearlDDPG(Trainer):
         mean_latent_stds = []
         latent_mean_task_distances = []
         
-        # Sample context for each episode
-        explore_steps = self.algo_config["exploration_steps"] 
-        '''
-        context = torch.cat([
-            torch.cat([
-                torch.from_numpy(traj.states[:explore_steps]).type(torch.float).to(DEVICE),
-                torch.from_numpy(traj.actions[:explore_steps]).type(torch.float).to(DEVICE),
-                torch.from_numpy(traj.rewards[:explore_steps]).type(torch.float).to(DEVICE),
-                torch.from_numpy(traj.next_states[:explore_steps]).type(torch.float).to(DEVICE)
-            ], dim=1).unsqueeze(0)
-            for task_trajs in trajectories
-            for traj in task_trajs
-        ], dim=0) # shape = (task/episode, explore_steps, concatenated_feature_size)
-        '''
-        context_task_indices = torch.tensor([
-            task_index
-            for task_index, task_trajs in zip(task_indices, trajectories)
-            for traj in task_trajs
-        ])
-        context = torch.cat([
-            self.task_encoder_exp_buffer.sample(task_index, explore_steps)[None, :, :-1] # Drop done mask
-            for context_task_index in context_task_indices
-        ], dim=0).to(DEVICE)
-        
         # Useful constants
-        episode_count, step_count, context_size = context.shape
+        explore_steps = self.algo_config["exploration_steps"]
         latent_size = self.algo_config["task_encoding_size"]
         
         for _ in range(self.algo_config["updates_per_train_step"]):
+            # Sample context for each episode
+            context_task_indices = torch.tensor([
+                task_index
+                for task_index, task_trajs in zip(task_indices, trajectories)
+                for traj in task_trajs
+            ])
+            context = torch.cat([
+                self.task_encoder_exp_buffer.sample(task_index, explore_steps)[None, :, :-1] # Drop done mask
+                for context_task_index in context_task_indices
+            ], dim=0).to(DEVICE)
+            episode_count = context.shape[0]
+            
             latent_mean, latent_var, latent = self.sample_latent(context)
             
             # Expand task encoding so it will match up with policy batch data

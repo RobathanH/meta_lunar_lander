@@ -92,7 +92,7 @@ class MultiTaskExpBuffer:
             self.full = [False for _ in range(num_train_tasks)]
         else:
             self.buffer = torch.load(os.path.join(load_dir, "exp_buffer.pt"))
-            assert self.buffer.shape == (capacity, obs_size + act_size + 1 + obs_size + 1)
+            assert self.buffer.shape == (num_train_tasks, capacity, obs_size + act_size + 1 + obs_size + 1)
             with open(os.path.join(load_dir, "exp_buffer_state.json"), "r") as fp:
                 state = json.load(fp)
                 self.next_ind = state["next_ind"]
