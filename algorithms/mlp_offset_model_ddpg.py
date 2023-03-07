@@ -15,40 +15,49 @@ from util import ActionNoise
 
 
 '''
-DDPG vanilla-RL algorithm, ignores the offset and treats the meta-RL
-problem like a regular RL problem.
+Policy that uses pretrained MLP to estimate offsets based on memory of trajectory,
+and uses that offset to correct the "no offset DDPG" actor.
 '''
 
 
 
-class DDPGPolicy(Policy):
-    def __init__(self, actor_net: MLP, action_size: int):
+class DDPGPolicyWithOffsetCorrectionMLP(Policy):
+    def __init__(self, actor_net: MLP, offset_net: MLP, action_size: int):
         self.actor_net = actor_net
+        self.offset_net = offset_net
         self.noise = ActionNoise(mu=np.zeros(action_size))
         
     def reset(self, task_index: int) -> None:
-        pass
+        self.memory = []
         
     def update_memory(self, state: np.ndarray, action: np.ndarray, reward: float, next_state: np.ndarray) -> None:
-        pass
+        cur_input = np.vstack([state, action, reward, next_state, [0]])
+        import pdb; pdb.set_trace()
+        self.memory.append(cur_input)
         
     @torch.no_grad()
     def get_action(self, state: np.ndarray) -> np.ndarray:
         state = torch.from_numpy(state).to(DEVICE).reshape(1, -1)
         action = self.actor_net(state).cpu().numpy().reshape(-1)
         action += self.noise()
-        return action
+        import pdb; pdb.set_trace()
+        if self.memory:
+            corrected_action = action - self.offset_net(torch.Tensor(self.memory, device=DEVICE)).cpu()
+        else:
+            corrected_action = action
+        return corrected_action
 
 
 
 
 class NaiveDDPG(Trainer):
-    def __init__(self, config: dict, load_dir: Optional[str] = None):
+    def __init__(self, config: dict, load_dir: str, offset_net_path: str):
         """
         Args:
             config (dict): Config dict for the current experiment.
-            load_dir (Optional[str]): Previous output dir from which to load task parameters,
-            network weights and exp buffer (if algo uses offline data). Default is None.
+            load_dir (str): Previous output dir from which to load task parameters,
+            network weights and exp buffer (if algo uses offline data).
+            offset_net_path (str): Path to offset estimation MLP .pt file.
         """
         # Parent class init creates self.config, self.task_params
         super().__init__(config, load_dir)
@@ -98,6 +107,9 @@ class NaiveDDPG(Trainer):
         
         # Create exp buffer
         self.exp_buffer = ExpBuffer(self.algo_config["exp_buffer_capacity"], obs_size, act_size, load_dir=load_dir)
+
+        # Load offset estimation MLP
+        self.offset_net = torch.load(offset_net_path).to(DEVICE)
         
         # Store Policy which uses current network params
         self.wrapped_policy = DDPGPolicy(self.actor, act_size)
