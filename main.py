@@ -62,6 +62,10 @@ def main(config: str, load_dir: Optional[str], iterations: int):
     elif config["algo_class"] == "simplified_pearl_ddpg":
         from algorithms import SimplifiedPearlDDPG
         trainer = SimplifiedPearlDDPG(config, load_dir=load_dir)
+    elif config["algo_class"] == "ddpg_with_offset_mlp":
+        from algorithms import OffsetMLPDDPG
+        # TODO: add commandline option to specify offset_net_path
+        trainer = OffsetMLPDDPG(config, load_dir=load_dir, offset_net_path="./notebooks/output/sas_to_offset_MLP_1_bestval.pt")
     else:
         raise NotImplementedError
     

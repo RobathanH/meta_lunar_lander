@@ -50,7 +50,7 @@ class DDPGPolicyWithOffsetCorrectionMLP(Policy):
 
 
 
-class NaiveDDPG(Trainer):
+class OffsetMLPDDPG(Trainer):
     def __init__(self, config: dict, load_dir: str, offset_net_path: str):
         """
         Args:
