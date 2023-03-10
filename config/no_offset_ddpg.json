@@ -10,5 +10,6 @@
         "target_net_update_tau": 1e-3
     },
     "test_period": null,
-    "max_episode_length": 1000
+    "max_episode_length": 400,
+    "min_engine_power": 0
 }

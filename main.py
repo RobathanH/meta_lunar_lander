@@ -85,7 +85,7 @@ def main(config: str, load_dir: Optional[str], iterations: int):
         output_dir = load_dir
         
     # init env with newly randomized or loaded task params
-    env = ActionOffsetLunarLander(trainer.task_params)
+    env = ActionOffsetLunarLander(trainer.task_params, min_engine_power=config["min_engine_power"])
     
     # init tensorboard logger
     logger = SummaryWriter(log_dir=os.path.join(output_dir, "logs"))

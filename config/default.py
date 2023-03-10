@@ -7,6 +7,7 @@ default_config = dict(
     observation_size=8,
     action_size=2,
     max_episode_length=400,
+    min_engine_power=0.5,
     discount_rate=0.99,
     action_offset_magnitude=0.2,
     num_train_tasks=100,
