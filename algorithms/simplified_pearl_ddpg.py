@@ -217,7 +217,7 @@ class SimplifiedPearlDDPG(Trainer):
                 for traj in task_trajs
             ])
             context = torch.cat([
-                self.task_encoder_exp_buffer.sample(task_index, explore_steps)[None, :, :-1] # Drop done mask
+                self.task_encoder_exp_buffer.sample(context_task_index, explore_steps)[None, :, :-1] # Drop done mask
                 for context_task_index in context_task_indices
             ], dim=0).to(DEVICE)
             episode_count = context.shape[0]
