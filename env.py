@@ -214,7 +214,8 @@ class ActionOffsetLunarLander(LunarLander):
 
 def collect_trajectories(env: ActionOffsetLunarLander, policy: Policy, 
                          task_indices: List[int], num_episodes: int,
-                         max_episode_length: int = 400, render: bool = False
+                         max_episode_length: int = 400, render: bool = False,
+                         eval: bool = False
                          ) -> Tuple[
                                 List[List[Trajectory]],
                                 dict,
@@ -228,6 +229,7 @@ def collect_trajectories(env: ActionOffsetLunarLander, policy: Policy,
         task_indices (List[int]): _description_
         num_episodes (int): _description_
         render (bool): Whether to render frames for each task.
+        eval (bool): Whether we're doing evaluation. If so, make starting conditions deterministic.
 
     Returns:
         List[List[Trajectory]]: List (over tasks) of list (over episodes) of trajectories.
@@ -250,7 +252,10 @@ def collect_trajectories(env: ActionOffsetLunarLander, policy: Policy,
             rewards = []
             
             policy.reset(task_index)
-            s, _ = env.reset(task_index)
+            if eval:
+                s, _ = env.reset(task_index, seed=episode_index)
+            else:
+                s, _ = env.reset(task_index)
             terminated = False
             truncated = False
             episode_length = 0
