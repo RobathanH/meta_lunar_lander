@@ -9,8 +9,11 @@
         "lr": 1e-4,
         "target_net_update_tau": 1e-3
     },
-    "test_period": null,
-    "action_offset_magnitude": 0.5,
+    "action_offset_magnitude": 1,
     "min_engine_power": 0,
-    "num_train_tasks": 100
+    "num_train_tasks": 100,
+
+    "test_period": 50,
+    "test_batch_size": 10,
+    "test_episodes": 1
 }

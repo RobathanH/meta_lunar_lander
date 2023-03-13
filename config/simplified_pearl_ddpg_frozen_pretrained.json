@@ -14,16 +14,16 @@
         "encoder_lr": null,
         "kl_lambda": 4.0,
         "target_net_update_tau": 1e-3,
-        "pretrained_no_offset_ddpg": "manually_saved_runs/no_offset_ddpg_0",
+        "pretrained_no_offset_ddpg": "output/no_offset_ddpg_2",
         "freeze_agent": true
     },
     "action_offset_magnitude": 0.5,
     "num_train_tasks": 100,
-    "num_test_tasks": 5,
-    "max_episode_length": 600,
+    "num_test_tasks": 20,
+    "max_episode_length": 400,
     "train_task_batch_size": 8,
     "train_episodes": 1,
-    "test_period": 10,
-    "test_task_batch_size": 4,
+    "test_period": 50,
+    "test_batch_size": 10,
     "test_episodes": 1
 }
