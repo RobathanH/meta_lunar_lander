@@ -101,7 +101,7 @@ def main(config: str, load_dir: Optional[str], iterations: int):
         train_task_params = trainer.task_params[task_indices]
         
         # Collect rollouts
-        rollouts, train_env_metrics, _ = collect_trajectories(env, trainer.current_policy(), train_task_params, config["train_episodes"], config["max_episode_length"])
+        rollouts, train_env_metrics, _ = collect_trajectories(env, trainer.current_policy(), train_task_params, config["train_episodes"], config["max_episode_length"], eval=False)
         log_info.update({f"train_env/{k}": v for k, v in train_env_metrics.items()})
         
         # Train step
@@ -112,7 +112,7 @@ def main(config: str, load_dir: Optional[str], iterations: int):
         if config["test_period"] and it % config["test_period"] == 0:
             test_task_indices = (config["num_train_tasks"] + np.random.choice(config["num_test_tasks"], size=config["test_task_batch_size"], replace=True)).tolist()
             test_task_params = trainer.task_params[test_task_indices]
-            rollouts, test_env_metrics, _ = collect_trajectories(env, trainer.current_policy(), test_task_params, config["test_episodes"], config["max_episode_length"])
+            rollouts, test_env_metrics, _ = collect_trajectories(env, trainer.current_policy(), test_task_params, config["test_episodes"], config["max_episode_length"], eval=True)
             log_info.update({f"test_env/{k}": v for k, v in test_env_metrics.items()})
         
         # Periodically record
@@ -125,7 +125,7 @@ def main(config: str, load_dir: Optional[str], iterations: int):
                 [-1, 0]
             ]) * config["action_offset_magnitude"]
             
-            _, _, frames = collect_trajectories(env, trainer.current_policy(), record_task_params, config["record_episodes"], config["max_episode_length"], render=True)
+            _, _, frames = collect_trajectories(env, trainer.current_policy(), record_task_params, config["record_episodes"], config["max_episode_length"], render=True, eval=True)
             for action_offset, task_frames in zip(record_task_params, frames):
                 save_video(
                     task_frames,

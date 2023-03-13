@@ -23,10 +23,13 @@ only sees data as it would look in the no-offset environment.
 class OffsetCorrectedGaussianPolicy(Policy):
     def __init__(self, policy_net: GaussianPolicyNet):
         self.policy_net = policy_net
-        self.action_offset = np.zeros(2)
         
-    def reset(self, action_offset: np.ndarray) -> None:
+    def reset(self, action_offset: np.ndarray, eval: bool = False) -> None:
+        # Save ground-truth action-offset
         self.action_offset = action_offset
+        
+        # Set eval flag
+        self.eval = eval
         
     @torch.no_grad()
     def get_action(self, state: np.ndarray) -> np.ndarray:

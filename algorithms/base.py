@@ -42,7 +42,7 @@ Base interface for policies, which provide actions and rollouts from the current
 '''
 class Policy(ABC):
     @abstractmethod
-    def reset(self, action_offset: np.ndarray) -> None:
+    def reset(self, action_offset: np.ndarray, eval: bool = False) -> None:
         """Reset the policy for a new episode/task.
         This would mean resetting the hidden state for an RNN,
         resetting to initial parameters for a MAML algorithm,
@@ -51,6 +51,7 @@ class Policy(ABC):
         Args:
             action_offset (np.ndarray): action-offset for the coming task. Shouldn't be used except for
             policies which cheat with extra information, like NoOffsetSAC.
+            eval (bool): Whether to disable training-time components, like action noise
         """
         pass
     

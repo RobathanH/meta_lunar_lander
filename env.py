@@ -210,7 +210,8 @@ class ActionOffsetLunarLander(LunarLander):
 
 def collect_trajectories(env: ActionOffsetLunarLander, policy: Policy, 
                          task_params: np.ndarray, num_episodes: int,
-                         max_episode_length: int = 400, render: bool = False
+                         max_episode_length: int = 400, render: bool = False,
+                         eval: bool = True
                          ) -> Tuple[
                                 List[List[Trajectory]],
                                 dict,
@@ -245,7 +246,7 @@ def collect_trajectories(env: ActionOffsetLunarLander, policy: Policy,
             actions = []
             rewards = []
             
-            policy.reset(action_offset)
+            policy.reset(action_offset, eval=eval)
             s, _ = env.reset(action_offset)
             terminated = False
             truncated = False
