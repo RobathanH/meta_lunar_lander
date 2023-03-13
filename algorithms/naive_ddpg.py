@@ -26,7 +26,7 @@ class DDPGPolicy(Policy):
         self.actor_net = actor_net
         self.noise = ActionNoise(mu=np.zeros(action_size))
         
-    def reset(self, task_index: int) -> None:
+    def reset(self, action_offset: np.ndarray) -> None:
         pass
         
     def update_memory(self, state: np.ndarray, action: np.ndarray, reward: float, next_state: np.ndarray) -> None:

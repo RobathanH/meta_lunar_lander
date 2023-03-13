@@ -29,7 +29,7 @@ class PearlDDPGPolicy(Policy):
         
         self.reset(0)
         
-    def reset(self, task_index: int) -> None:
+    def reset(self, action_offset: np.ndarray) -> None:
         # Ignore task index
         
         # Reset noise

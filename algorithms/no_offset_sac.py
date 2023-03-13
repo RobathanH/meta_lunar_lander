@@ -21,13 +21,12 @@ only sees data as it would look in the no-offset environment.
 
 
 class OffsetCorrectedGaussianPolicy(Policy):
-    def __init__(self, policy_net: GaussianPolicyNet, task_params: np.ndarray):
+    def __init__(self, policy_net: GaussianPolicyNet):
         self.policy_net = policy_net
-        self.task_params = task_params
-        self.current_task_index = 0
+        self.action_offset = np.zeros(2)
         
-    def reset(self, task_index: int) -> None:
-        self.current_task_index = task_index
+    def reset(self, action_offset: np.ndarray) -> None:
+        self.action_offset = action_offset
         
     @torch.no_grad()
     def get_action(self, state: np.ndarray) -> np.ndarray:
@@ -101,7 +100,7 @@ class NoOffsetSAC(Trainer):
         self.exp_buffer = ExpBuffer(self.algo_config["exp_buffer_capacity"], obs_size, act_size, load_dir=load_dir)
         
         # Store Policy which uses current network params and automatically accounts for ground-truth offset in returned actions
-        self.wrapped_policy = OffsetCorrectedGaussianPolicy(self.policy, self.task_params)
+        self.wrapped_policy = OffsetCorrectedGaussianPolicy(self.policy)
         
         
         

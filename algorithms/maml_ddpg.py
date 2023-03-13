@@ -79,7 +79,7 @@ class MamlPolicy(Policy):
         
         self.reset(0)
         
-    def reset(self, task_index: int) -> None:
+    def reset(self, action_offset: np.ndarray) -> None:
         # Ignore task_index
         
         # Reset adapted params to None

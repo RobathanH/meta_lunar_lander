@@ -8,7 +8,6 @@ from algorithms import Policy, Trajectory
 class ActionOffsetLunarLander(LunarLander):
     def __init__(
         self,
-        task_params: np.ndarray,
         min_engine_power: float = 0.5,
         gravity: float = -10.0,
         enable_wind: bool = False,
@@ -21,14 +20,11 @@ class ActionOffsetLunarLander(LunarLander):
         # By default, at 0.5, the main engine will not fire unless the action value is > 0, in the upper half of the allowable range
         self.min_engine_power = min_engine_power
         
-        # Store randomized task-specific parameters
-        self.task_params = task_params
-        
         # State variable to store action offset for current task
-        self.action_offset = self.task_params[0]
+        self.action_offset = np.zeros(2)
         
-    def reset(self, task_index: int, *args, **kwargs):
-        self.action_offset = self.task_params[task_index]
+    def reset(self, action_offset: np.ndarray, *args, **kwargs):
+        self.action_offset = action_offset
         return super().reset(*args, **kwargs)
         
     def step(self, action):
@@ -213,7 +209,7 @@ class ActionOffsetLunarLander(LunarLander):
 
 
 def collect_trajectories(env: ActionOffsetLunarLander, policy: Policy, 
-                         task_indices: List[int], num_episodes: int,
+                         task_params: np.ndarray, num_episodes: int,
                          max_episode_length: int = 400, render: bool = False
                          ) -> Tuple[
                                 List[List[Trajectory]],
@@ -225,7 +221,7 @@ def collect_trajectories(env: ActionOffsetLunarLander, policy: Policy,
     Args:
         env (ActionOffsetLunarLander): _description_
         policy (Policy): _description_
-        task_indices (List[int]): _description_
+        task_params (np.ndarray): Parameters for each task to collect in. Shape = (task batch size, 2)
         num_episodes (int): _description_
         render (bool): Whether to render frames for each task.
 
@@ -240,7 +236,7 @@ def collect_trajectories(env: ActionOffsetLunarLander, policy: Policy,
     else:
         frames = None
         
-    for task_index in task_indices:
+    for action_offset in task_params:
         trajectories.append([])
         if render:
             frames.append([])
@@ -249,8 +245,8 @@ def collect_trajectories(env: ActionOffsetLunarLander, policy: Policy,
             actions = []
             rewards = []
             
-            policy.reset(task_index)
-            s, _ = env.reset(task_index)
+            policy.reset(action_offset)
+            s, _ = env.reset(action_offset)
             terminated = False
             truncated = False
             episode_length = 0
@@ -283,12 +279,13 @@ def collect_trajectories(env: ActionOffsetLunarLander, policy: Policy,
                 # Prepare for next step
                 s = next_s
             
-            trajectories[-1].append(Trajectory(task_index, states, actions, rewards, terminated=terminated))
+            trajectories[-1].append(Trajectory(states, actions, rewards, terminated=terminated))
             
     # TODO: Compute metrics
     metrics = {
         "mean_return": np.mean([traj.rewards.sum() for task_trajs in trajectories for traj in task_trajs]),
-        "mean_ep_len": np.mean([len(traj) for task_trajs in trajectories for traj in task_trajs])
+        "mean_ep_len": np.mean([len(traj) for task_trajs in trajectories for traj in task_trajs]),
+        "return_std": np.std([traj.rewards.sum() for task_trajs in trajectories for traj in task_trajs])
     }
         
     return trajectories, metrics, frames

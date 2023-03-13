@@ -16,7 +16,7 @@ Properties:
     done_mask:
 '''
 class Trajectory:
-    def __init__(self, task_index: int, states: List[np.ndarray], actions: List[np.ndarray], rewards: List[float], terminated: bool = True):
+    def __init__(self, states: List[np.ndarray], actions: List[np.ndarray], rewards: List[float], terminated: bool = True):
         """
         Args:
             task_index (int): Index of the task used to collect this trajectory.
@@ -25,7 +25,6 @@ class Trajectory:
             rewards (List[float]): List of rewards received. Should be 1 shorter than states list.
             terminated (bool): Whether the episode was ended by a game-over state, as opposed to a step limit (in which case we may want the agent to keep reasoning forward to possible future states)
         """
-        self.task_index = task_index
         self.states = np.array(states[:-1])
         self.actions = np.array(actions)
         self.rewards = np.array(rewards).reshape(-1, 1)
@@ -43,14 +42,14 @@ Base interface for policies, which provide actions and rollouts from the current
 '''
 class Policy(ABC):
     @abstractmethod
-    def reset(self, task_index: int) -> None:
+    def reset(self, action_offset: np.ndarray) -> None:
         """Reset the policy for a new episode/task.
         This would mean resetting the hidden state for an RNN,
         resetting to initial parameters for a MAML algorithm,
         or nothing for historyless policies in vanilla RL.
         
         Args:
-            task_index (int): index for the coming task. Shouldn't be used except for
+            action_offset (np.ndarray): action-offset for the coming task. Shouldn't be used except for
             policies which cheat with extra information, like NoOffsetSAC.
         """
         pass

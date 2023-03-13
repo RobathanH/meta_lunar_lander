@@ -85,7 +85,7 @@ def main(config: str, load_dir: Optional[str], iterations: int):
         output_dir = load_dir
         
     # init env with newly randomized or loaded task params
-    env = ActionOffsetLunarLander(trainer.task_params, min_engine_power=config["min_engine_power"])
+    env = ActionOffsetLunarLander(min_engine_power=config["min_engine_power"])
     
     # init tensorboard logger
     logger = SummaryWriter(log_dir=os.path.join(output_dir, "logs"))
@@ -98,9 +98,10 @@ def main(config: str, load_dir: Optional[str], iterations: int):
         
         # Select batch of tasks
         task_indices = np.random.choice(config["num_train_tasks"], size=config["train_task_batch_size"], replace=True).tolist()
+        train_task_params = trainer.task_params[task_indices]
         
         # Collect rollouts
-        rollouts, train_env_metrics, _ = collect_trajectories(env, trainer.current_policy(), task_indices, config["train_episodes"], config["max_episode_length"])
+        rollouts, train_env_metrics, _ = collect_trajectories(env, trainer.current_policy(), train_task_params, config["train_episodes"], config["max_episode_length"])
         log_info.update({f"train_env/{k}": v for k, v in train_env_metrics.items()})
         
         # Train step
@@ -110,23 +111,28 @@ def main(config: str, load_dir: Optional[str], iterations: int):
         # Periodically run on test
         if config["test_period"] and it % config["test_period"] == 0:
             test_task_indices = (config["num_train_tasks"] + np.random.choice(config["num_test_tasks"], size=config["test_task_batch_size"], replace=True)).tolist()
-            rollouts, test_env_metrics, _ = collect_trajectories(env, trainer.current_policy(), test_task_indices, config["test_episodes"], config["max_episode_length"])
+            test_task_params = trainer.task_params[test_task_indices]
+            rollouts, test_env_metrics, _ = collect_trajectories(env, trainer.current_policy(), test_task_params, config["test_episodes"], config["max_episode_length"])
             log_info.update({f"test_env/{k}": v for k, v in test_env_metrics.items()})
         
         # Periodically record
         if config["record_period"] and it % config["record_period"] == 0:
-            # Use fixed tasks for recording, to make it easier to see improvements
-            # One train task, one test task
-            record_task_indices = [0, config["num_train_tasks"]]
+            # Record videos for maximal action offsets in each direction
+            record_task_params = np.array([
+                [0, 1],
+                [0, -1],
+                [1, 0],
+                [-1, 0]
+            ]) * config["action_offset_magnitude"]
             
-            _, _, frames = collect_trajectories(env, trainer.current_policy(), record_task_indices, config["record_episodes"], config["max_episode_length"], render=True)
-            for task_index, task_frames in zip(record_task_indices, frames):
+            _, _, frames = collect_trajectories(env, trainer.current_policy(), record_task_params, config["record_episodes"], config["max_episode_length"], render=True)
+            for action_offset, task_frames in zip(record_task_params, frames):
                 save_video(
                     task_frames,
                     os.path.join(output_dir, "videos"),
                     episode_trigger=lambda x: True,
                     fps=env.metadata["render_fps"],
-                    name_prefix=f"step_{trainer.trainer_state['global_step']}.task_{task_index}.offset_{env.task_params[task_index, 0]:.2f}_{env.task_params[task_index, 1]:.2f}"
+                    name_prefix=f"step_{trainer.trainer_state['global_step']}.offset_{action_offset[0]:.2f}_{action_offset[1]:.2f}"
                 )
                 
         # Periodically save
