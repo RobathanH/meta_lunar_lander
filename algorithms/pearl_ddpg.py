@@ -19,9 +19,10 @@ Uses PEARL meta-learning algorithm on top of DDPG baseline
 '''
 
 class PearlDDPGPolicy(Policy):
-    def __init__(self, actor_net: MLP, sample_latent_func: Callable, exploration_steps: int, state_size: int, action_size: int, latent_size: int):
+    def __init__(self, actor_net: MLP, sample_latent_func: Callable, update_latent_every_action: bool, exploration_steps: int, state_size: int, action_size: int, latent_size: int):
         self.actor_net = actor_net
         self.sample_latent_func = sample_latent_func
+        self.update_latent_every_action = update_latent_every_action
         self.exploration_steps = exploration_steps
         self.state_size = state_size
         self.action_size = action_size
@@ -39,6 +40,10 @@ class PearlDDPGPolicy(Policy):
         # Sample latent from uniform prior
         self.latent = torch.normal(torch.zeros(1, self.latent_size), torch.ones(1, self.latent_size)).to(DEVICE)
         
+        # Maintain latent mean/std after computation
+        self.latent_mean = None
+        self.latent_var = None
+        
         # Reset step counter
         self.step_counter = 0
         
@@ -49,19 +54,35 @@ class PearlDDPGPolicy(Policy):
     def update_memory(self, state: np.ndarray, action: np.ndarray, reward: float, next_state: np.ndarray) -> None:
         self.step_counter += 1
         
-        if self.step_counter <= self.exploration_steps:
-            self.mem.append(
-                torch.cat([
-                    torch.from_numpy(state).type(torch.float),
-                    torch.from_numpy(action).type(torch.float),
-                    torch.tensor([reward]).type(torch.float),
-                    torch.from_numpy(next_state).type(torch.float)
-                ], dim=0).reshape(1, 1, -1)
-            )
-            
-            if self.step_counter == self.exploration_steps:
-                context_batch = torch.cat(self.mem, dim=1).to(DEVICE)
-                _, _, self.latent = self.sample_latent_func(context_batch)
+        new_context_element = torch.cat([
+            torch.from_numpy(state).type(torch.float),
+            torch.from_numpy(action).type(torch.float),
+            torch.tensor([reward]).type(torch.float),
+            torch.from_numpy(next_state).type(torch.float)
+        ], dim=0).reshape(1, 1, -1)
+        
+        if self.update_latent_every_action:
+            # Sample latent distribution factor for latest transition seen, then multiply it into the running latent distribution and resample latent
+            new_latent_mean_element, new_latent_var_element, _ = self.sample_latent_func(new_context_element.to(DEVICE))
+            if self.step_counter == 1:
+                self.latent_mean = new_latent_mean_element
+                self.latent_var = new_latent_var_element
+            else:
+                latent_means = torch.cat([self.latent_mean.unsqueeze(1), new_latent_mean_element.unsqueeze(1)], dim=1)
+                latent_vars = torch.cat([self.latent_var.unsqueeze(1), new_latent_var_element.unsqueeze(1)], dim=1)
+
+                self.latent_var = torch.reciprocal(torch.reciprocal(latent_vars).sum(dim=1))
+                self.latent_mean = self.latent_var * (latent_means / latent_vars).sum(dim=1)
+                
+            # Resample latent
+            self.latent = torch.normal(self.latent_mean, self.latent_var.sqrt())
+        else:
+            if self.step_counter <= self.exploration_steps:
+                self.mem.append(new_context_element)
+                
+                if self.step_counter == self.exploration_steps:
+                    context_batch = torch.cat(self.mem, dim=1).to(DEVICE)
+                    self.latent_mean, self.latent_var, self.latent = self.sample_latent_func(context_batch)
         
     @torch.no_grad()
     def get_action(self, state: np.ndarray) -> np.ndarray:
@@ -141,7 +162,8 @@ class PearlDDPG(Trainer):
         # Task encoder exp buffer doesn't get saved or loaded, since it should focus primarily on online data
         self.task_encoder_exp_buffer = MultiTaskExpBuffer(config["num_train_tasks"], self.algo_config["task_encoder_exp_buffer_capacity"], obs_size, act_size)
         
-        self.wrapped_policy = PearlDDPGPolicy(self.actor, self.sample_latent, self.algo_config["exploration_steps"], obs_size, act_size, latent_size)
+        self.wrapped_policy = PearlDDPGPolicy(self.actor, self.sample_latent, self.algo_config["update_latent_every_action"],
+                                              self.algo_config["exploration_steps"], obs_size, act_size, latent_size)
         
     def save(self, output_dir: str) -> None:
         super().save(output_dir)
@@ -190,7 +212,10 @@ class PearlDDPG(Trainer):
         for task_index, task_trajs in zip(task_indices, trajectories):
             for traj in task_trajs:
                 self.exp_buffer.add_trajectory(task_index, traj)
-                self.task_encoder_exp_buffer.add_trajectory(task_index, traj, max_length=self.algo_config["exploration_steps"])
+                if self.algo_config["update_latent_every_action"]:
+                    self.task_encoder_exp_buffer.add_trajectory(task_index, traj)
+                else:
+                    self.task_encoder_exp_buffer.add_trajectory(task_index, traj, max_length=self.algo_config["exploration_steps"])
                 
         # Save average losses
         critic_losses = []
