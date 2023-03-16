@@ -31,18 +31,17 @@ class DDPGPolicyWithOffsetCorrectionMLP(Policy):
         self.memory = []
         
     def update_memory(self, state: np.ndarray, action: np.ndarray, reward: float, next_state: np.ndarray) -> None:
-        cur_input = np.vstack([state, action, reward, next_state, [0]])
-        import pdb; pdb.set_trace()
+        done_mask = np.zeros((1,))
+        cur_input = np.hstack([state, action, reward, next_state, done_mask])
         self.memory.append(cur_input)
         
     @torch.no_grad()
     def get_action(self, state: np.ndarray) -> np.ndarray:
         state = torch.from_numpy(state).to(DEVICE).reshape(1, -1)
         action = self.actor_net(state).cpu().numpy().reshape(-1)
-        action += self.noise()
-        import pdb; pdb.set_trace()
+        # action += self.noise()
         if self.memory:
-            corrected_action = action - self.offset_net(torch.Tensor(self.memory, device=DEVICE)).cpu()
+            corrected_action = action - self.offset_net(torch.Tensor(np.array(self.memory)).to(DEVICE)).mean(0).cpu().numpy()
         else:
             corrected_action = action
         return corrected_action
@@ -109,10 +108,10 @@ class OffsetMLPDDPG(Trainer):
         self.exp_buffer = ExpBuffer(self.algo_config["exp_buffer_capacity"], obs_size, act_size, load_dir=load_dir)
 
         # Load offset estimation MLP
-        self.offset_net = torch.load(offset_net_path).to(DEVICE)
+        offset_net = torch.load(offset_net_path).to(DEVICE)
         
         # Store Policy which uses current network params
-        self.wrapped_policy = DDPGPolicy(self.actor, act_size)
+        self.wrapped_policy = DDPGPolicyWithOffsetCorrectionMLP(self.actor, offset_net, act_size)
         
         
         
