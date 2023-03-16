@@ -51,7 +51,6 @@ class DDPGPolicyWithOffsetCorrectionMLP(Policy):
         if not self.eval:
             action += self.noise()
         
-        import pdb; pdb.set_trace()
         if self.memory:
             corrected_action = action - self.offset_net(torch.Tensor(np.array(self.memory)).to(DEVICE)).mean(0).cpu().numpy()
         else:
