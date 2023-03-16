@@ -25,9 +25,17 @@ class DDPGPolicyWithOffsetCorrectionMLP(Policy):
     def __init__(self, actor_net: MLP, offset_net: MLP, action_size: int):
         self.actor_net = actor_net
         self.offset_net = offset_net
-        self.noise = ActionNoise(mu=np.zeros(action_size))
+        self.action_size = action_size
         
-    def reset(self, task_index: int) -> None:
+    def reset(self, action_offset: np.ndarray, eval: bool = False) -> None:
+        # Ignore task_index
+        
+        # Set eval flag
+        self.eval = eval
+        
+        # Reset action noise
+        self.noise = ActionNoise(mu=np.zeros(self.action_size))
+        
         self.memory = []
         
     def update_memory(self, state: np.ndarray, action: np.ndarray, reward: float, next_state: np.ndarray) -> None:
@@ -39,7 +47,11 @@ class DDPGPolicyWithOffsetCorrectionMLP(Policy):
     def get_action(self, state: np.ndarray) -> np.ndarray:
         state = torch.from_numpy(state).to(DEVICE).reshape(1, -1)
         action = self.actor_net(state).cpu().numpy().reshape(-1)
-        # action += self.noise()
+        
+        if not self.eval:
+            action += self.noise()
+        
+        import pdb; pdb.set_trace()
         if self.memory:
             corrected_action = action - self.offset_net(torch.Tensor(np.array(self.memory)).to(DEVICE)).mean(0).cpu().numpy()
         else:

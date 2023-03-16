@@ -24,10 +24,16 @@ problem like a regular RL problem.
 class DDPGPolicy(Policy):
     def __init__(self, actor_net: MLP, action_size: int):
         self.actor_net = actor_net
-        self.noise = ActionNoise(mu=np.zeros(action_size))
+        self.action_size = action_size
         
-    def reset(self, task_index: int) -> None:
-        pass
+    def reset(self, action_offset: np.ndarray, eval: bool = False) -> None:
+        # Ignore task_index
+        
+        # Set eval flag
+        self.eval = eval
+        
+        # Reset action noise
+        self.noise = ActionNoise(mu=np.zeros(self.action_size))
         
     def update_memory(self, state: np.ndarray, action: np.ndarray, reward: float, next_state: np.ndarray) -> None:
         pass
@@ -36,7 +42,10 @@ class DDPGPolicy(Policy):
     def get_action(self, state: np.ndarray) -> np.ndarray:
         state = torch.from_numpy(state).to(DEVICE).reshape(1, -1)
         action = self.actor_net(state).cpu().numpy().reshape(-1)
-        action += self.noise()
+        
+        if not self.eval:
+            action += self.noise()
+            
         return action
 
 

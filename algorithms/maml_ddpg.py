@@ -75,12 +75,16 @@ class MamlPolicy(Policy):
         self.actor_meta_params = actor_meta_params
         self.adapt_func = adapt_func
         self.exploration_steps = exploration_steps
-        self.noise = ActionNoise(mu=np.zeros(action_size))
+        self.action_size = action_size
         
-        self.reset(0)
-        
-    def reset(self, task_index: int) -> None:
+    def reset(self, action_offset: np.ndarray, eval: bool = False) -> None:
         # Ignore task_index
+        
+        # Set eval flag
+        self.eval = eval
+        
+        # Reset action noise
+        self.noise = ActionNoise(mu=np.zeros(self.action_size))
         
         # Reset adapted params to None
         self.adapted_actor_params = None
@@ -124,6 +128,10 @@ class MamlPolicy(Policy):
         else:
             action = self.actor.forward(self.adapted_actor_params, state)
         action = action.cpu().numpy().reshape(-1)
+        
+        if not self.eval:
+            action += self.noise()
+        
         return action
 
 class MamlDDPG(Trainer):

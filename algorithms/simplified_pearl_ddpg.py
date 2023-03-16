@@ -30,10 +30,11 @@ class SimplifiedPearlDDPGPolicy(Policy):
         self.state_size = state_size
         self.action_size = action_size
         
-        self.reset(0)
-        
-    def reset(self, task_index: int) -> None:
+    def reset(self, action_offset: np.ndarray, eval: bool = False) -> None:
         # Ignore task index
+        
+        # Set eval flag
+        self.eval = eval
         
         # Reset noise
         self.noise = ActionNoise(mu=np.zeros(self.action_size))
@@ -69,7 +70,11 @@ class SimplifiedPearlDDPGPolicy(Policy):
     def get_action(self, state: np.ndarray) -> np.ndarray:
         state = torch.from_numpy(state).type(torch.float).unsqueeze(0).to(DEVICE)
         action = self.actor_net(state) - self.latent
-        action = action.cpu().numpy().flatten() + self.noise()
+        action = action.cpu().numpy().flatten()
+        
+        if not self.eval:
+            action += self.noise()
+            
         return action
                 
         

@@ -22,15 +22,19 @@ Uses knowledge of true task params to manually correct for current task offset.
 
 
 class OffsetCorrectedPolicy(Policy):
-    def __init__(self, actor_net: MLP, task_params: np.ndarray, action_size: int):
+    def __init__(self, actor_net: MLP, action_size: int):
         self.actor_net = actor_net
-        self.task_params = task_params
-        self.current_task_index = 0
+        self.action_size = action_size
         
-        self.noise = ActionNoise(mu=np.zeros(action_size))
+    def reset(self, action_offset: np.ndarray, eval: bool = False) -> None:
+        # Save ground-truth action-offset
+        self.action_offset = action_offset
         
-    def reset(self, task_index: int) -> None:
-        self.current_task_index = task_index
+        # Set eval flag
+        self.eval = eval
+        
+        # Reset action noise
+        self.noise = ActionNoise(mu=np.zeros(self.action_size))
         
     def update_memory(self, state: np.ndarray, action: np.ndarray, reward: float, next_state: np.ndarray) -> None:
         pass
@@ -39,8 +43,11 @@ class OffsetCorrectedPolicy(Policy):
     def get_action(self, state: np.ndarray) -> np.ndarray:
         state = torch.from_numpy(state).to(DEVICE).reshape(1, -1)
         action = self.actor_net(state).cpu().numpy().reshape(-1)
-        action += self.noise()
-        corrected_action = action - self.task_params[self.current_task_index]
+        
+        if not self.eval:
+            action += self.noise()
+        
+        corrected_action = action - self.action_offset
         return corrected_action
 
 
@@ -104,7 +111,7 @@ class NoOffsetDDPG(Trainer):
         self.exp_buffer = ExpBuffer(self.algo_config["exp_buffer_capacity"], obs_size, act_size, load_dir=load_dir)
         
         # Store Policy which uses current network params and automatically accounts for ground-truth offset in returned actions
-        self.wrapped_policy = OffsetCorrectedPolicy(self.actor, self.task_params, act_size)
+        self.wrapped_policy = OffsetCorrectedPolicy(self.actor, act_size)
         
         
         
