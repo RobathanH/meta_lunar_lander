@@ -15,7 +15,7 @@
         "kl_lambda": 4.0,
         "target_net_update_tau": 1e-3,
         "pretrained_no_offset_ddpg": "manually_saved_runs/no_offset_ddpg_2",
-        "freeze_agent": true
+        "freeze_agent": false
     },
     "action_offset_magnitude": 1,
     "num_train_tasks": 100,

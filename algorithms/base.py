@@ -145,3 +145,9 @@ class Trainer(ABC):
         # Update trainer state
         self.trainer_state["global_step"] += 1
         return {}
+    
+    def choose_next_train_task_indices(self) -> Optional[List[int]]:
+        """Called before collecting rollouts, allows Trainer to actively select the next tasks to collect rollouts on.
+        By default, returns a random selection of training task indices.
+        """
+        return np.random.choice(self.config["num_train_tasks"], size=self.config["train_task_batch_size"], replace=True).tolist()

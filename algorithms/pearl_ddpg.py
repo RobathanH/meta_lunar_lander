@@ -1,6 +1,7 @@
 import os
 import json
 import itertools
+import heapq
 from typing import Optional, List, Callable, Dict, Tuple
 import numpy as np
 
@@ -165,6 +166,11 @@ class PearlDDPG(Trainer):
         self.wrapped_policy = PearlDDPGPolicy(self.actor, self.sample_latent, self.algo_config["update_latent_every_action"],
                                               self.algo_config["exploration_steps"], obs_size, act_size, latent_size)
         
+        if self.algo_config["prioritized_level_replay"]:
+            self.max_return = np.full(config["num_train_tasks"], np.nan)
+            self.regret = np.full(config["num_train_tasks"], np.nan)
+            self.prioritized_task_indices = set() # Set of task indices in plr buffer
+        
     def save(self, output_dir: str) -> None:
         super().save(output_dir)
         torch.save(self.critic.state_dict(), os.path.join(output_dir, "critic.pt"))
@@ -216,6 +222,9 @@ class PearlDDPG(Trainer):
                     self.task_encoder_exp_buffer.add_trajectory(task_index, traj)
                 else:
                     self.task_encoder_exp_buffer.add_trajectory(task_index, traj, max_length=self.algo_config["exploration_steps"])
+                    
+        # Train on all tasks with new data
+        task_batch_indices = task_indices
                 
         # Save average losses
         critic_losses = []
@@ -230,33 +239,28 @@ class PearlDDPG(Trainer):
         
         for _ in range(self.algo_config["updates_per_train_step"]):
             # Sample context for each episode
-            context_task_indices = torch.tensor([
-                task_index
-                for task_index, task_trajs in zip(task_indices, trajectories)
-                for traj in task_trajs
-            ])
             context = torch.cat([
                 self.task_encoder_exp_buffer.sample(context_task_index, explore_steps)[None, :, :-1] # Drop done mask
-                for context_task_index in context_task_indices
+                for context_task_index in task_batch_indices
             ], dim=0).to(DEVICE)
-            episode_count = context.shape[0]
-            
-            latent_mean, latent_var, latent = self.sample_latent(context)
-            
-            # Expand task encoding so it will match up with policy batch data
-            # shape = (episode_count * batch_size, latent_size)
-            latent = latent.unsqueeze(1).expand(episode_count, self.algo_config["batch_size"], latent_size).reshape(-1, latent_size)
             
             # Sample off-policy data for task-conditioned policy update
             batch = torch.cat([
                 self.exp_buffer.sample(task_index, self.algo_config["batch_size"]).unsqueeze(0).to(DEVICE)
-                for task_index in context_task_indices
-            ], dim=0) # shape = (episode_count, batch_size, all_features_concatenated_size)
-            batch = batch.flatten(end_dim=1) # shape = (episode_count * batch_size, all_features_concat_size)
+                for task_index in task_batch_indices
+            ], dim=0) # shape = (task_batch_size, sample_batch_size, all_features_concatenated_size)
+            batch = batch.flatten(end_dim=1) # shape = (task_batch_size * sample_batch_size, all_features_concat_size)
             state, action, reward, next_state, done_mask = torch.split(
                 batch, [self.config["observation_size"], self.config["action_size"], 1, self.config["observation_size"], 1],
                 dim=1
             )
+            
+            # Compute task encoding
+            latent_mean, latent_var, latent = self.sample_latent(context)
+            
+            # Expand task encoding so it will match up with policy batch data
+            # shape = (task_batch_size * sample_batch_size, latent_size)
+            latent = latent.unsqueeze(1).expand(-1, self.algo_config["batch_size"], -1).reshape(-1, latent_size)
             
             # critic loss (q_pred may propagate back to task encoder)
             with torch.no_grad():
@@ -308,11 +312,30 @@ class PearlDDPG(Trainer):
             kl_losses.append(kl_loss.item())
             mean_latent_stds.append(latent_var.sqrt().mean())
             
-            # dist between each latent-mean (one for each episode collected)
-            latent_mean = latent_mean.detach().cpu().unsqueeze(0)
-            latent_mean_task_dmatrix = torch.cdist(latent_mean, latent_mean)[0]
-            latent_mean_task_distance = torch.sum(latent_mean_task_dmatrix * (1 - torch.eye(episode_count))) / (episode_count * (episode_count - 1))
+            # dist between each latent-mean (one for each task collected)
+            latent_mean = latent_mean.detach().cpu()
+            latent_mean_task_dmatrix = torch.cdist(latent_mean, latent_mean)
+            task_batch_size = len(latent_mean)
+            latent_mean_task_distance = torch.sum(latent_mean_task_dmatrix * (1 - torch.eye(task_batch_size))) / (task_batch_size * (task_batch_size - 1))
             latent_mean_task_distances.append(latent_mean_task_distance)
+            
+        
+        # Update prioritized replay buffer
+        if self.algo_config["prioritized_level_replay"]:
+            self.update_regret_estimates(task_indices, trajectories)
+            
+            # Update prioritized task buffer
+            unprioritized_task_indices = [task_index for task_index in task_indices if task_index not in self.prioritized_task_indices]
+            for task_index in unprioritized_task_indices:
+                if len(self.prioritized_task_indices) < self.algo_config["plr_buffer_size"]:
+                    self.prioritized_task_indices.add(task_index)
+                else:
+                    worst_prioritized_task = min(self.prioritized_task_indices, key=lambda i: self.regret[i])
+                    if self.regret[task_index] > self.regret[worst_prioritized_task]:
+                        self.prioritized_task_indices.remove(worst_prioritized_task)
+                        self.prioritized_task_indices.add(task_index)
+                
+                
             
         # Collect metrics
         metrics = {}
@@ -322,3 +345,65 @@ class PearlDDPG(Trainer):
         metrics["latent_std"] = sum(mean_latent_stds) / len(mean_latent_stds)
         metrics["latent_mean_task_distance"] = sum(latent_mean_task_distances) / len(latent_mean_task_distances)
         return metrics
+    
+    
+    
+    
+    '''
+    Helper functions for prioritized level replay
+    '''
+    
+    def choose_next_train_task_indices(self) -> Optional[List[int]]:
+        """Called before collecting rollouts, allows Trainer to actively select the next tasks to collect rollouts on.
+        By default, returns a random selection of training task indices.
+        """
+        if not self.algo_config["prioritized_level_replay"]:
+            return super().choose_next_train_task_indices()
+        
+        # Use random sampling until buffer is full
+        if len(self.prioritized_task_indices) < self.algo_config["plr_buffer_size"]:
+            return super().choose_next_train_task_indices()
+
+        task_indices = []
+        for i in range(self.config["train_task_batch_size"]):
+            if np.random.rand() <= self.algo_config["plr_probability"]:
+                task_indices.append(np.random.choice(list(self.prioritized_task_indices)))
+            else:
+                unprioritized_task_indices = list(set(range(self.config["num_train_tasks"])) - self.prioritized_task_indices)
+                task_indices.append(np.random.choice(unprioritized_task_indices))
+        return task_indices
+        
+        
+    @torch.no_grad()        
+    def update_regret_estimates(self, task_indices: List[int], trajectories: List[List[Trajectory]]):
+        for task_index, task_trajs in zip(task_indices, trajectories):
+            # Update max return for this task
+            for traj in task_trajs:
+                rewards = traj.rewards
+                discounted_return = np.sum(rewards * np.power(self.config["discount_rate"], np.arange(len(rewards))))
+                if np.isnan(self.max_return[task_index]) or discounted_return > self.max_return[task_index]:
+                    self.max_return[task_index] = discounted_return
+            
+            # Estimate average value for task
+            value = []
+            for traj in task_trajs:
+                # Compute latent mean (no sampling)
+                context_steps = self.algo_config["exploration_steps"]
+                context = torch.cat([
+                    torch.from_numpy(traj.states[:context_steps]).type(torch.float),
+                    torch.from_numpy(traj.actions[:context_steps]).type(torch.float),
+                    torch.from_numpy(traj.rewards[:context_steps]).type(torch.float),
+                    torch.from_numpy(traj.next_states[:context_steps]).type(torch.float)
+                ], dim=1)[None, :, :].to(DEVICE)
+                latent_mean, _, _ = self.sample_latent(context)
+                
+                # Compute estimated value at each step
+                states = torch.from_numpy(traj.states).type(torch.float).to(DEVICE)
+                latent = latent_mean.expand(len(states), -1)
+                
+                chosen_actions = self.actor(states, latent)
+                value.append(self.critic(states, chosen_actions, latent).cpu().mean())
+            value = np.mean(value)
+
+            # Update regret estimates
+            self.regret[task_index] = self.max_return[task_index] - value

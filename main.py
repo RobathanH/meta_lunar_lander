@@ -97,7 +97,7 @@ def main(config: str, load_dir: Optional[str], iterations: int):
         log_info = {}
         
         # Select batch of tasks
-        task_indices = np.random.choice(config["num_train_tasks"], size=config["train_task_batch_size"], replace=True).tolist()
+        task_indices = trainer.choose_next_train_task_indices()
         train_task_params = trainer.task_params[task_indices]
         
         # Collect rollouts
