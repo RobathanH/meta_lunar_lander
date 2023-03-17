@@ -52,6 +52,7 @@ class DDPGPolicyWithOffsetCorrectionMLP(Policy):
             action += self.noise()
         
         if self.memory:
+            # corrected_action = action - self.offset_net(torch.Tensor(np.array(self.memory)).to(DEVICE)).median(0).values.cpu().numpy()
             corrected_action = action - self.offset_net(torch.Tensor(np.array(self.memory)).to(DEVICE)).mean(0).cpu().numpy()
         else:
             corrected_action = action
