@@ -248,7 +248,10 @@ def collect_trajectories(env: ActionOffsetLunarLander, policy: Policy,
             rewards = []
             
             policy.reset(action_offset, eval=eval)
-            s, _ = env.reset(action_offset, seed=episode_index)
+            if eval:
+                s, _ = env.reset(action_offset, seed=episode_index)
+            else:
+                s, _ = env.reset(action_offset)
             terminated = False
             truncated = False
             episode_length = 0
