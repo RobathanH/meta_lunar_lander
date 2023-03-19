@@ -22,10 +22,11 @@ and uses that offset to correct the "no offset DDPG" actor.
 
 
 class DDPGPolicyWithOffsetCorrectionMLP(Policy):
-    def __init__(self, actor_net: MLP, offset_net: MLP, action_size: int):
+    def __init__(self, actor_net: MLP, offset_net: MLP, action_size: int, prior: bool):
         self.actor_net = actor_net
         self.offset_net = offset_net
         self.action_size = action_size
+        self.prior = prior
         
     def reset(self, action_offset: np.ndarray, eval: bool = False) -> None:
         # Ignore task_index
@@ -51,18 +52,27 @@ class DDPGPolicyWithOffsetCorrectionMLP(Policy):
         if not self.eval:
             action += self.noise()
         
-        if self.memory:
-            # corrected_action = action - self.offset_net(torch.Tensor(np.array(self.memory)).to(DEVICE)).median(0).values.cpu().numpy()
-            corrected_action = action - self.offset_net(torch.Tensor(np.array(self.memory)).to(DEVICE)).mean(0).cpu().numpy()
+        if self.prior:
+            if self.memory:
+                estimate_offsets = self.offset_net(torch.Tensor(np.array(self.memory)).to(DEVICE)).cpu()
+                estimate_offsets = torch.cat([estimate_offsets, torch.tensor([[-1, 0]] * 1)], dim=0)
+                estimate_offset = estimate_offsets.mean(0).numpy()
+                corrected_action = action - estimate_offset
+            else:
+                corrected_action = action - np.array([-1, 0])
         else:
-            corrected_action = action
+            if self.memory:
+                # corrected_action = action - self.offset_net(torch.Tensor(np.array(self.memory)).to(DEVICE)).median(0).values.cpu().numpy()
+                corrected_action = action - self.offset_net(torch.Tensor(np.array(self.memory)).to(DEVICE)).mean(0).cpu().numpy()
+            else:
+                corrected_action = action
         return corrected_action
 
 
 
 
 class OffsetMLPDDPG(Trainer):
-    def __init__(self, config: dict, load_dir: str, offset_net_path: str):
+    def __init__(self, config: dict, load_dir: str, offset_net_path: str, prior: bool = True):
         """
         Args:
             config (dict): Config dict for the current experiment.
@@ -123,7 +133,7 @@ class OffsetMLPDDPG(Trainer):
         offset_net = torch.load(offset_net_path).to(DEVICE)
         
         # Store Policy which uses current network params
-        self.wrapped_policy = DDPGPolicyWithOffsetCorrectionMLP(self.actor, offset_net, act_size)
+        self.wrapped_policy = DDPGPolicyWithOffsetCorrectionMLP(self.actor, offset_net, act_size, prior)
         
         
         
