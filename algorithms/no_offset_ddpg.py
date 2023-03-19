@@ -43,11 +43,13 @@ class OffsetCorrectedPolicy(Policy):
     def get_action(self, state: np.ndarray) -> np.ndarray:
         state = torch.from_numpy(state).to(DEVICE).reshape(1, -1)
         action = self.actor_net(state).cpu().numpy().reshape(-1)
-        
-        if not self.eval:
+
+        if self.eval:
+            corrected_action = action
+        else:
             action += self.noise()
-        
-        corrected_action = action - self.action_offset
+            corrected_action = action - self.action_offset
+
         return corrected_action
 
 
