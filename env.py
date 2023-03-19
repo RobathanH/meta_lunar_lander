@@ -79,7 +79,7 @@ class ActionOffsetLunarLander(LunarLander):
         dispersion = [self.np_random.uniform(-1.0, +1.0) / SCALE for _ in range(2)]
 
         m_power = 0.0
-        if (self.continuous and action[0] > 0.0) or (
+        if (self.continuous) or (
             not self.continuous and action == 2
         ):
             # Main engine
@@ -118,7 +118,7 @@ class ActionOffsetLunarLander(LunarLander):
             )
 
         s_power = 0.0
-        if (self.continuous and np.abs(action[1]) > 0.5) or (
+        if (self.continuous) or (
             not self.continuous and action in [1, 3]
         ):
             # Orientation engines
